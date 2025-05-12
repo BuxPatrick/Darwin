@@ -1,5 +1,6 @@
 import { createContext, useState, useContext, ReactNode, useEffect } from "react";
 import { auth } from "@/lib/firebaseConfig";
+import { db } from "@/lib/firebaseConfig";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -7,6 +8,7 @@ import {
   onAuthStateChanged,
   User as FirebaseUser
 } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
 
 type User = {
   id: string;
@@ -74,7 +76,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setLoading(true);
     setError(null);
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      // Create user document in Firestore
+      await setDoc(doc(db, "users", userCredential.user.uid), {
+        uid: userCredential.user.uid,
+        email: userCredential.user.email,
+        createdAt: new Date().toISOString(),
+      });
     } catch (err: any) {
       setError(err.message || "Signup failed");
     } finally {
