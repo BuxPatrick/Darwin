@@ -1,5 +1,5 @@
-
 import { createContext, useState, useContext, ReactNode, useEffect } from "react";
+import { generateGeminiResponse } from "@/lib/gemini";
 
 export type LearningMode = "explain" | "quiz" | "eli5" | "challenge";
 
@@ -47,22 +47,6 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Mock AI response based on user input
-  const generateAIResponse = async (userMessage: string): Promise<string> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Generate AI response based on the learning mode
-    const responses = {
-      explain: `Here's an explanation: ${userMessage} involves concepts related to [topic]. The key principles are X, Y, and Z. Think of it like [analogy].`,
-      quiz: `Let's test your knowledge on ${userMessage}. Question: What is the primary concept behind [related concept]? A) Option 1, B) Option 2, C) Option 3, D) Option 4`,
-      eli5: `Imagine ${userMessage} is like playing with toys. When you [simplified analogy], that's basically what's happening with [concept] in simple terms!`,
-      challenge: `That's an interesting question about ${userMessage}. Let's go beyond the basics. Consider this challenging scenario: [complex scenario]. How would you apply the principles to solve it?`
-    };
-    
-    return responses[learningMode];
-  };
-
   // Detect subject and topic from user message
   const detectSubjectAndTopic = (message: string) => {
     // In real implementation, this would call a backend API that uses Gemini
@@ -102,8 +86,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
         setSubjectInfo(newSubjectInfo);
       }
 
-      // Generate AI response
-      const aiResponseContent = await generateAIResponse(content);
+      // Generate AI response using Gemini
+      const aiResponseContent = await generateGeminiResponse(content);
       
       // Add AI response
       const aiMessage: MessageType = {
