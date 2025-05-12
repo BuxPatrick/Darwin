@@ -1,5 +1,6 @@
 import { createContext, useState, useContext, ReactNode, useEffect } from "react";
 import { generateGeminiResponse, detectSubjectAndTopic } from "@/lib/gemini";
+import { useTopic } from "./TopicContext";
 
 export type LearningMode = "explain" | "quiz" | "eli5" | "challenge";
 
@@ -8,11 +9,14 @@ export type MessageType = {
   content: string;
   sender: "user" | "ai";
   timestamp: Date;
+  subject?: string;
+  topic?: string;
 };
 
 export type SubjectInfo = {
   subject: string;
   topic: string;
+  relatedSubjects?: string[];
 } | null;
 
 interface ChatContextType {
@@ -30,7 +34,7 @@ const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export function useChat() {
   const context = useContext(ChatContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error("useChat must be used within a ChatProvider");
   }
   return context;
@@ -41,6 +45,7 @@ interface ChatProviderProps {
 }
 
 export function ChatProvider({ children }: ChatProviderProps) {
+  const { addTopicToHistory, validateTopic, getRelatedTopics } = useTopic();
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [subjectInfo, setSubjectInfo] = useState<SubjectInfo>(null);
   const [learningMode, setLearningMode] = useState<LearningMode>("explain");
@@ -64,11 +69,39 @@ export function ChatProvider({ children }: ChatProviderProps) {
       
       setMessages(prev => [...prev, userMessage]);
 
-      // Always detect subject and topic for new messages
+      // Detect subject and topic
       console.log('Detecting subject and topic for message:', content);
       const newSubjectInfo = await detectSubjectAndTopic(content);
       console.log('Detected subject info:', newSubjectInfo);
-      setSubjectInfo(newSubjectInfo);
+
+      if (newSubjectInfo) {
+        // Validate the detected topic
+        const isValidTopic = validateTopic(newSubjectInfo.subject, newSubjectInfo.topic);
+        
+        if (!isValidTopic) {
+          console.log('Invalid topic detected, using default topic');
+          newSubjectInfo.topic = 'General';
+        }
+
+        // Get related subjects
+        const relatedSubjects = getRelatedTopics(newSubjectInfo.subject);
+        
+        // Update subject info with related subjects
+        setSubjectInfo({
+          ...newSubjectInfo,
+          relatedSubjects
+        });
+
+        // Add to topic history
+        await addTopicToHistory(newSubjectInfo.subject, newSubjectInfo.topic, content);
+
+        // Update user message with subject and topic
+        userMessage.subject = newSubjectInfo.subject;
+        userMessage.topic = newSubjectInfo.topic;
+        setMessages(prev => prev.map(msg => 
+          msg.id === userMessage.id ? userMessage : msg
+        ));
+      }
 
       // Generate AI response using Gemini
       const aiResponseContent = await generateGeminiResponse(content);
@@ -78,7 +111,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
         id: (Date.now() + 1).toString(),
         content: aiResponseContent,
         sender: "ai",
-        timestamp: new Date()
+        timestamp: new Date(),
+        subject: newSubjectInfo?.subject,
+        topic: newSubjectInfo?.topic
       };
       
       setMessages(prev => [...prev, aiMessage]);
