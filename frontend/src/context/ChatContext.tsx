@@ -1,5 +1,5 @@
 import { createContext, useState, useContext, ReactNode, useEffect } from "react";
-import { generateGeminiResponse } from "@/lib/gemini";
+import { generateGeminiResponse, detectSubjectAndTopic } from "@/lib/gemini";
 
 export type LearningMode = "explain" | "quiz" | "eli5" | "challenge";
 
@@ -47,22 +47,6 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Detect subject and topic from user message
-  const detectSubjectAndTopic = (message: string) => {
-    // In real implementation, this would call a backend API that uses Gemini
-    // For now, we'll use a simple mock implementation
-    
-    if (message.toLowerCase().includes("math")) {
-      return { subject: "Mathematics", topic: "Calculus" };
-    } else if (message.toLowerCase().includes("science")) {
-      return { subject: "Science", topic: "Physics" };
-    } else if (message.toLowerCase().includes("history")) {
-      return { subject: "History", topic: "World Wars" };
-    } else {
-      return { subject: "General Knowledge", topic: "Learning" };
-    }
-  };
-
   const sendMessage = async (content: string) => {
     if (!content.trim()) return;
     
@@ -80,11 +64,11 @@ export function ChatProvider({ children }: ChatProviderProps) {
       
       setMessages(prev => [...prev, userMessage]);
 
-      // Update subject and topic if this is the first message or if we detect a new subject
-      if (messages.length === 0 || Math.random() > 0.7) {
-        const newSubjectInfo = detectSubjectAndTopic(content);
-        setSubjectInfo(newSubjectInfo);
-      }
+      // Always detect subject and topic for new messages
+      console.log('Detecting subject and topic for message:', content);
+      const newSubjectInfo = await detectSubjectAndTopic(content);
+      console.log('Detected subject info:', newSubjectInfo);
+      setSubjectInfo(newSubjectInfo);
 
       // Generate AI response using Gemini
       const aiResponseContent = await generateGeminiResponse(content);
